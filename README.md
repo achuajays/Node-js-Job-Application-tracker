@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="image.png" alt="JobTracker Banner" width="800">
+
 # 🎯 JobTracker
 
 **A full-stack Job Application Tracker with production-grade DevOps infrastructure on GCP.**
