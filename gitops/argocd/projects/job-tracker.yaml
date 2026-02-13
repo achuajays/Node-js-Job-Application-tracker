@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: job-tracker
+  namespace: argocd
+spec:
+  description: Job Tracker Application Project
+  sourceRepos:
+    - "https://github.com/your-org/job-tracker.git"
+  destinations:
+    - namespace: staging
+      server: https://kubernetes.default.svc
+    - namespace: production
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  roles:
+    - name: dev-team
+      description: Development team access
+      policies:
+        - p, proj:job-tracker:dev-team, applications, get, job-tracker/*, allow
+        - p, proj:job-tracker:dev-team, applications, sync, job-tracker/*, allow

@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: job-tracker-production
+  namespace: argocd
+  labels:
+    app: job-tracker
+    env: production
+spec:
+  project: job-tracker
+  source:
+    repoURL: https://github.com/your-org/job-tracker.git
+    targetRevision: main
+    path: helm/job-tracker
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    # Manual sync for production — requires explicit approval
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
