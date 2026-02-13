@@ -1,0 +1,96 @@
+# ─── Image ──────────────────────────────────────────
+image:
+  repository: gcr.io/my-gcp-project/job-tracker
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# ─── Replicas ───────────────────────────────────────
+replicaCount: 2
+
+# ─── Resources ──────────────────────────────────────
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# ─── Service ────────────────────────────────────────
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+# ─── Ingress ────────────────────────────────────────
+ingress:
+  enabled: true
+  className: gce
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: job-tracker-ip
+    networking.gke.io/managed-certificates: job-tracker-cert
+  hosts:
+    - host: jobtracker.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ─── Environment ────────────────────────────────────
+env:
+  NODE_ENV: production
+  PORT: "3000"
+  JWT_EXPIRES_IN: "7d"
+
+# ─── Secrets (from K8s Secret) ──────────────────────
+secrets:
+  JWT_SECRET:
+    secretName: job-tracker-secrets
+    key: jwt-secret
+
+# ─── Health Checks ──────────────────────────────────
+health:
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# ─── Persistence (SQLite) ──────────────────────────
+persistence:
+  enabled: true
+  storageClass: standard
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  mountPath: /app/data
+
+# ─── Autoscaling ────────────────────────────────────
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# ─── Service Account ───────────────────────────────
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# ─── Pod ────────────────────────────────────────────
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

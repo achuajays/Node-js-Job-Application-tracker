@@ -1,0 +1,59 @@
+services:
+  # ─── Application ──────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job-tracker
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+  # ─── Development Override ─────────────────────────
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job-tracker-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - JWT_SECRET=dev-secret-key-for-local-only
+      - JWT_EXPIRES_IN=7d
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - dev-data:/app/data
+    command: npx nodemon server.js
+    restart: unless-stopped
+    profiles:
+      - dev
+
+volumes:
+  app-data:
+    driver: local
+  dev-data:
+    driver: local

@@ -1,0 +1,37 @@
+# Production overrides
+replicaCount: 3
+
+image:
+  tag: stable
+
+ingress:
+  hosts:
+    - host: jobtracker.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: jobtracker-tls
+      hosts:
+        - jobtracker.example.com
+
+env:
+  NODE_ENV: production
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 15
+  targetCPUUtilizationPercentage: 60
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+persistence:
+  size: 5Gi
+  storageClass: premium-rwo

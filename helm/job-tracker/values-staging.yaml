@@ -1,0 +1,29 @@
+# Staging overrides
+replicaCount: 1
+
+image:
+  tag: staging
+
+ingress:
+  hosts:
+    - host: jobtracker-staging.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  NODE_ENV: staging
+
+autoscaling:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+persistence:
+  size: 512Mi
