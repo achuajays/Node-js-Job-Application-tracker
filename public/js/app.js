@@ -4,7 +4,7 @@
 
 const API_BASE = '/api';
 
-// ─── State ──────────────────────────────────────────────────
+// ─── State ──────────────────────────────────────────────
 let state = {
     token: localStorage.getItem('jt_token'),
     user: JSON.parse(localStorage.getItem('jt_user') || 'null'),
@@ -13,7 +13,7 @@ let state = {
     filters: { search: '', status: '' },
 };
 
-// ─── API Helper ─────────────────────────────────────────────
+// ─── API Helper ─────────────────────────────────────────
 async function api(endpoint, options = {}) {
     const config = {
         headers: { 'Content-Type': 'application/json' },
@@ -41,25 +41,31 @@ async function api(endpoint, options = {}) {
     return data;
 }
 
-// ─── Toast Notifications ────────────────────────────────────
+// ─── Toast Notifications ────────────────────────────────
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
 
+    const colors = {
+        success: 'border-l-4 border-emerald-500',
+        error: 'border-l-4 border-red-500',
+        info: 'border-l-4 border-indigo-500',
+    };
     const icons = { success: '✓', error: '✕', info: 'ℹ' };
 
+    toast.className = `toast-enter bg-white rounded-lg shadow-xl px-5 py-3.5 flex items-center gap-3 text-sm text-gray-700 min-w-[280px] max-w-[400px] border border-gray-100 ${colors[type] || colors.info}`;
+
     toast.innerHTML = `
-    <span>${icons[type] || 'ℹ'}</span>
-    <span>${message}</span>
-    <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+    <span class="font-bold text-base">${icons[type] || 'ℹ'}</span>
+    <span class="flex-1">${message}</span>
+    <button class="text-gray-400 hover:text-gray-600 text-lg leading-none ml-2" onclick="this.parentElement.remove()">&times;</button>
   `;
 
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
 }
 
-// ─── Auth Functions ─────────────────────────────────────────
+// ─── Auth Functions ─────────────────────────────────────
 function setAuth(token, user) {
     state.token = token;
     state.user = user;
@@ -132,15 +138,13 @@ async function logout() {
         if (state.token) {
             await api('/auth/logout', { method: 'POST' });
         }
-    } catch (_) {
-        // Ignore errors on logout
-    }
+    } catch (_) { }
     clearAuth();
     showAuthSection();
     showToast('Logged out successfully', 'info');
 }
 
-// ─── View Switching ─────────────────────────────────────────
+// ─── View Switching ─────────────────────────────────────
 function showAuthSection() {
     document.getElementById('auth-section').style.display = 'flex';
     document.getElementById('dashboard-section').style.display = 'none';
@@ -161,12 +165,11 @@ function updateNavbar() {
     }
 }
 
-// ─── Stats ──────────────────────────────────────────────────
+// ─── Stats ──────────────────────────────────────────────
 async function loadStats() {
     try {
         const data = await api('/auth/me');
         const stats = data.data.stats;
-
         document.getElementById('stat-total').textContent = stats.total_jobs || 0;
         document.getElementById('stat-applied').textContent = stats.applied || 0;
         document.getElementById('stat-interview').textContent = stats.interviews || 0;
@@ -178,21 +181,19 @@ async function loadStats() {
     }
 }
 
-// ─── Jobs CRUD ──────────────────────────────────────────────
+// ─── Jobs CRUD ──────────────────────────────────────────
 async function loadJobs() {
     try {
         const params = new URLSearchParams({
             page: state.pagination.page,
             limit: state.pagination.limit,
         });
-
         if (state.filters.search) params.set('search', state.filters.search);
         if (state.filters.status) params.set('status', state.filters.status);
 
         const data = await api(`/jobs?${params.toString()}`);
         state.jobs = data.data;
         state.pagination = data.pagination;
-
         renderJobs();
         renderPagination();
     } catch (error) {
@@ -213,56 +214,70 @@ function renderJobs() {
     emptyState.style.display = 'none';
 
     grid.innerHTML = state.jobs.map(job => `
-    <div class="job-card" data-status="${job.status}" data-id="${job.id}">
-      <div class="job-card-header">
-        <div>
-          <div class="job-company">${escapeHtml(job.company)}</div>
-          <div class="job-position">${escapeHtml(job.position)}</div>
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden animate-fadeIn relative group">
+      <div class="job-card-bar bar-${job.status}"></div>
+      <div class="p-5">
+        <!-- Header -->
+        <div class="flex items-start justify-between mb-3">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-base font-bold text-gray-900 truncate">${escapeHtml(job.company)}</h3>
+            <p class="text-sm text-gray-500 mt-0.5 truncate">${escapeHtml(job.position)}</p>
+          </div>
+          <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+            <button onclick="openEditModal(${job.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Edit">✏️</button>
+            <button onclick="openDeleteModal(${job.id})" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition" title="Delete">🗑️</button>
+          </div>
         </div>
-        <div class="job-card-actions">
-          <button class="btn btn-ghost btn-icon btn-sm" onclick="openEditModal(${job.id})" title="Edit">✏️</button>
-          <button class="btn btn-ghost btn-icon btn-sm" onclick="openDeleteModal(${job.id})" title="Delete">🗑️</button>
+
+        <!-- Meta Tags -->
+        <div class="flex flex-wrap gap-2 mb-3">
+          ${job.location ? `<span class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-full">📍 ${escapeHtml(job.location)}</span>` : ''}
+          <span class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-full">${formatJobType(job.job_type)}</span>
+          ${job.salary_min || job.salary_max ? `<span class="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full font-medium">💰 ${formatSalary(job.salary_min, job.salary_max)}</span>` : ''}
+          ${job.url ? `<a href="${escapeHtml(job.url)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-indigo-500 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full hover:bg-indigo-100 transition">🔗 Link</a>` : ''}
         </div>
-      </div>
 
-      <div class="job-meta">
-        ${job.location ? `<span class="job-meta-item">📍 ${escapeHtml(job.location)}</span>` : ''}
-        <span class="job-meta-item">${formatJobType(job.job_type)}</span>
-        ${job.salary_min || job.salary_max ? `<span class="job-meta-item job-salary">💰 ${formatSalary(job.salary_min, job.salary_max)}</span>` : ''}
-        ${job.url ? `<span class="job-meta-item"><a href="${escapeHtml(job.url)}" target="_blank" rel="noopener" style="color: inherit; text-decoration: none;">🔗 Link</a></span>` : ''}
-      </div>
+        ${job.notes ? `<p class="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-50 line-clamp-2">${escapeHtml(job.notes)}</p>` : ''}
 
-      ${job.notes ? `<div class="job-notes">${escapeHtml(job.notes)}</div>` : ''}
-
-      <div class="job-footer">
-        <span class="status-badge ${job.status}" onclick="openStatusModal(${job.id}, '${job.status}')">
-          ${formatStatus(job.status)}
-        </span>
-        <span class="job-date">
-          ${job.applied_date ? `Applied: ${formatDate(job.applied_date)}` : `Created: ${formatDate(job.created_at)}`}
-          ${job.deadline ? ` · Due: ${formatDate(job.deadline)}` : ''}
-        </span>
+        <!-- Footer -->
+        <div class="flex items-center justify-between mt-4 pt-3 border-t border-gray-50">
+          <button onclick="openStatusModal(${job.id}, '${job.status}')" class="${getStatusClasses(job.status)} inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition hover:scale-105 cursor-pointer border">
+            ${formatStatus(job.status)}
+          </button>
+          <span class="text-[11px] text-gray-400">
+            ${job.applied_date ? formatDate(job.applied_date) : formatDate(job.created_at)}
+          </span>
+        </div>
       </div>
     </div>
   `).join('');
 }
 
+function getStatusClasses(status) {
+    const map = {
+        wishlist: 'bg-purple-50 text-purple-600 border-purple-200',
+        applied: 'bg-blue-50 text-blue-600 border-blue-200',
+        phone_screen: 'bg-cyan-50 text-cyan-600 border-cyan-200',
+        interview: 'bg-amber-50 text-amber-600 border-amber-200',
+        offer: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+        rejected: 'bg-red-50 text-red-600 border-red-200',
+        withdrawn: 'bg-gray-100 text-gray-500 border-gray-200',
+        accepted: 'bg-green-50 text-green-600 border-green-200',
+    };
+    return map[status] || map.applied;
+}
+
 function renderPagination() {
     const pag = document.getElementById('pagination');
     const { page, pages, total } = state.pagination;
-
-    if (pages <= 1) {
-        pag.style.display = 'none';
-        return;
-    }
-
+    if (pages <= 1) { pag.style.display = 'none'; return; }
     pag.style.display = 'flex';
     document.getElementById('page-info').textContent = `Page ${page} of ${pages} (${total} total)`;
     document.getElementById('prev-btn').disabled = page <= 1;
     document.getElementById('next-btn').disabled = page >= pages;
 }
 
-// ─── Create/Edit Modal ──────────────────────────────────────
+// ─── Create/Edit Modal ──────────────────────────────────
 function openCreateModal() {
     document.getElementById('modal-title').textContent = 'Add Application';
     document.getElementById('job-form').reset();
@@ -277,7 +292,6 @@ async function openEditModal(jobId) {
     try {
         const data = await api(`/jobs/${jobId}`);
         const job = data.data;
-
         document.getElementById('modal-title').textContent = 'Edit Application';
         document.getElementById('job-id').value = job.id;
         document.getElementById('job-company').value = job.company || '';
@@ -292,7 +306,6 @@ async function openEditModal(jobId) {
         document.getElementById('job-url').value = job.url || '';
         document.getElementById('job-notes').value = job.notes || '';
         document.getElementById('modal-save-btn').textContent = 'Update Application';
-
         toggleModal('job-modal-overlay', true);
     } catch (error) {
         showToast(error.message, 'error');
@@ -326,7 +339,6 @@ async function handleJobSave() {
             await api('/jobs', { method: 'POST', body });
             showToast('Application added! 🎉', 'success');
         }
-
         toggleModal('job-modal-overlay', false);
         loadJobs();
         loadStats();
@@ -337,7 +349,7 @@ async function handleJobSave() {
     }
 }
 
-// ─── Status Modal ───────────────────────────────────────────
+// ─── Status Modal ───────────────────────────────────────
 function openStatusModal(jobId, currentStatus) {
     document.getElementById('status-job-id').value = jobId;
     document.getElementById('new-status').value = currentStatus;
@@ -363,11 +375,10 @@ async function handleStatusSave() {
     }
 }
 
-// ─── Delete Modal ───────────────────────────────────────────
+// ─── Delete Modal ───────────────────────────────────────
 function openDeleteModal(jobId) {
     const job = state.jobs.find(j => j.id === jobId);
     if (!job) return;
-
     document.getElementById('delete-job-id').value = jobId;
     document.getElementById('delete-company').textContent = job.company;
     document.getElementById('delete-position').textContent = job.position;
@@ -392,7 +403,7 @@ async function handleDelete() {
     }
 }
 
-// ─── Modal Helpers ──────────────────────────────────────────
+// ─── Modal Helpers ──────────────────────────────────────
 function toggleModal(id, show) {
     const overlay = document.getElementById(id);
     if (show) {
@@ -404,7 +415,7 @@ function toggleModal(id, show) {
     }
 }
 
-// ─── Formatting Helpers ─────────────────────────────────────
+// ─── Formatting Helpers ─────────────────────────────────
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -448,26 +459,16 @@ function formatSalary(min, max) {
 function formatDate(dateStr) {
     if (!dateStr) return '';
     try {
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-        });
-    } catch {
-        return dateStr;
-    }
+        return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch { return dateStr; }
 }
 
-// ─── Debounce ───────────────────────────────────────────────
 function debounce(fn, delay) {
     let timer;
-    return (...args) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn(...args), delay);
-    };
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
 }
 
-// ─── Event Listeners ────────────────────────────────────────
+// ─── Event Listeners ────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     // Auth tabs
     document.getElementById('login-tab-btn').addEventListener('click', () => {
@@ -533,29 +534,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Pagination
     document.getElementById('prev-btn').addEventListener('click', () => {
-        if (state.pagination.page > 1) {
-            state.pagination.page--;
-            loadJobs();
-        }
+        if (state.pagination.page > 1) { state.pagination.page--; loadJobs(); }
     });
-
     document.getElementById('next-btn').addEventListener('click', () => {
-        if (state.pagination.page < state.pagination.pages) {
-            state.pagination.page++;
-            loadJobs();
-        }
+        if (state.pagination.page < state.pagination.pages) { state.pagination.page++; loadJobs(); }
     });
 
-    // Keyboard shortcut — Escape to close modals
+    // Escape to close modals
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            ['job-modal-overlay', 'status-modal-overlay', 'delete-modal-overlay'].forEach(id => {
-                toggleModal(id, false);
-            });
+            ['job-modal-overlay', 'status-modal-overlay', 'delete-modal-overlay'].forEach(id => toggleModal(id, false));
         }
     });
 
-    // ─── Initialize ─────────────────────────────────────────
+    // Initialize
     if (state.token && state.user) {
         showDashboard();
     } else {
