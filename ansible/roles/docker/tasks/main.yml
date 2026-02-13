@@ -1,0 +1,62 @@
+---
+# ═══════════════════════════════════════════════════
+# Docker Role — Install Docker CE
+# ═══════════════════════════════════════════════════
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Install Docker CE
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+
+- name: Start and enable Docker
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Add deploy user to docker group
+  user:
+    name: deploy
+    groups: docker
+    append: yes
+
+- name: Configure Docker daemon
+  copy:
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "storage-driver": "overlay2",
+        "live-restore": true
+      }
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Docker
+
+- name: Install Google Cloud SDK for GAR auth
+  shell: |
+    curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+    echo "deb https://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
+    apt-get update && apt-get install -y google-cloud-cli
+  args:
+    creates: /usr/bin/gcloud

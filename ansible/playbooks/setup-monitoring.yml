@@ -1,0 +1,28 @@
+---
+# ═══════════════════════════════════════════════════
+# Playbook: Setup Monitoring Stack
+# Target: monitoring group hosts
+# ═══════════════════════════════════════════════════
+
+- name: Provision monitoring server (Prometheus + Grafana)
+  hosts: monitoring
+  become: yes
+
+  roles:
+    - common
+    - docker
+    - monitoring
+
+  post_tasks:
+    - name: Summary
+      debug:
+        msg: |
+          ✅ Monitoring stack provisioned successfully!
+          
+          Prometheus: http://{{ ansible_host }}:9090
+          Grafana:    http://{{ ansible_host }}:3001 (admin/admin)
+          
+          Next steps:
+          1. Add Prometheus as a data source in Grafana
+          2. Import Node.js dashboard (ID: 11159)
+          3. Configure alert rules for job-tracker health

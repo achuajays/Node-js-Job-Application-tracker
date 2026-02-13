@@ -1,0 +1,29 @@
+---
+# ═══════════════════════════════════════════════════
+# Playbook: Setup Jenkins CI/CD Server
+# Target: jenkins group hosts
+# ═══════════════════════════════════════════════════
+
+- name: Provision Jenkins CI/CD server
+  hosts: jenkins
+  become: yes
+
+  roles:
+    - common
+    - docker
+    - jenkins
+
+  post_tasks:
+    - name: Summary
+      debug:
+        msg: |
+          ✅ Jenkins server provisioned successfully!
+          
+          Access:  http://{{ ansible_host }}:8080
+          Password: {{ jenkins_password.stdout }}
+          
+          Next steps:
+          1. Complete Jenkins setup wizard
+          2. Install plugins: Docker Pipeline, Google Cloud SDK, Kubernetes CLI
+          3. Add credentials: GCP SA key, Docker registry, kubectl config
+          4. Create pipeline job pointing to Jenkinsfile

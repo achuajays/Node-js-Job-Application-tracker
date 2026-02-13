@@ -1,0 +1,92 @@
+---
+# ═══════════════════════════════════════════════════
+# Monitoring Role — Prometheus + Grafana (Docker)
+# ═══════════════════════════════════════════════════
+
+- name: Create monitoring directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: deploy
+    group: deploy
+    mode: "0755"
+  loop:
+    - /opt/monitoring
+    - /opt/monitoring/prometheus
+    - /opt/monitoring/grafana
+
+- name: Create Prometheus configuration
+  copy:
+    content: |
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+
+      scrape_configs:
+        - job_name: 'prometheus'
+          static_configs:
+            - targets: ['localhost:9090']
+
+        - job_name: 'job-tracker'
+          metrics_path: /api/health
+          static_configs:
+            - targets: ['app-staging-01:3000']
+          scrape_interval: 30s
+    dest: /opt/monitoring/prometheus/prometheus.yml
+    owner: deploy
+    group: deploy
+
+- name: Create monitoring docker-compose
+  copy:
+    content: |
+      services:
+        prometheus:
+          image: prom/prometheus:latest
+          container_name: prometheus
+          ports:
+            - "9090:9090"
+          volumes:
+            - /opt/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+            - prometheus-data:/prometheus
+          command:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.retention.time=30d'
+          restart: unless-stopped
+
+        grafana:
+          image: grafana/grafana:latest
+          container_name: grafana
+          ports:
+            - "3001:3000"
+          volumes:
+            - grafana-data:/var/lib/grafana
+          environment:
+            - GF_SECURITY_ADMIN_PASSWORD=admin
+            - GF_USERS_ALLOW_SIGN_UP=false
+          restart: unless-stopped
+          depends_on:
+            - prometheus
+
+      volumes:
+        prometheus-data:
+        grafana-data:
+    dest: /opt/monitoring/docker-compose.yml
+    owner: deploy
+    group: deploy
+
+- name: Start monitoring stack
+  command: docker compose up -d
+  args:
+    chdir: /opt/monitoring
+
+- name: UFW - Allow Prometheus
+  ufw:
+    rule: allow
+    port: "9090"
+    proto: tcp
+
+- name: UFW - Allow Grafana
+  ufw:
+    rule: allow
+    port: "3001"
+    proto: tcp

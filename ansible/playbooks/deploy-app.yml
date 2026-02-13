@@ -1,0 +1,95 @@
+---
+# ═══════════════════════════════════════════════════
+# Playbook: Deploy Job Tracker App (Direct)
+# Fallback deployment without Kubernetes
+# Target: app_servers group hosts
+# ═══════════════════════════════════════════════════
+
+- name: Deploy Job Tracker application
+  hosts: app_servers
+  become: yes
+
+  vars:
+    app_image: "{{ gcp_region }}-docker.pkg.dev/{{ gcp_project }}/job-tracker-registry/job-tracker"
+    app_tag: "{{ image_tag | default('latest') }}"
+    app_port: 3000
+
+  roles:
+    - common
+    - docker
+
+  tasks:
+    - name: Authenticate with Artifact Registry
+      command: gcloud auth configure-docker {{ gcp_region }}-docker.pkg.dev --quiet
+
+    - name: Pull application image
+      docker_image:
+        name: "{{ app_image }}:{{ app_tag }}"
+        source: pull
+        force_source: yes
+
+    - name: Stop existing container
+      docker_container:
+        name: job-tracker
+        state: absent
+      ignore_errors: yes
+
+    - name: Create data directory
+      file:
+        path: /opt/job-tracker/data
+        state: directory
+        owner: "1001"
+        group: "1001"
+        mode: "0755"
+
+    - name: Create .env file
+      copy:
+        content: |
+          NODE_ENV=production
+          PORT={{ app_port }}
+          JWT_SECRET={{ jwt_secret | default('change-me') }}
+          JWT_EXPIRES_IN=7d
+        dest: /opt/job-tracker/.env
+        owner: "1001"
+        mode: "0600"
+
+    - name: Run application container
+      docker_container:
+        name: job-tracker
+        image: "{{ app_image }}:{{ app_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "{{ app_port }}:3000"
+        volumes:
+          - /opt/job-tracker/data:/app/data
+        env_file: /opt/job-tracker/.env
+        memory: 512m
+        cpus: 1.0
+        healthcheck:
+          test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+
+    - name: UFW - Allow app port
+      ufw:
+        rule: allow
+        port: "{{ app_port }}"
+        proto: tcp
+
+    - name: Wait for application to start
+      uri:
+        url: "http://localhost:{{ app_port }}/api/health"
+        status_code: 200
+      register: health
+      retries: 10
+      delay: 5
+      until: health.status == 200
+
+    - name: Deployment summary
+      debug:
+        msg: |
+          ✅ Job Tracker deployed successfully!
+          URL: http://{{ ansible_host }}:{{ app_port }}
+          Image: {{ app_image }}:{{ app_tag }}
