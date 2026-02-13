@@ -89,6 +89,52 @@ flowchart LR
     ANSIBLE -.->|configures| BUILD
 ```
 
+## GitHub Actions CI/CD
+
+The project includes a full **GitHub Actions** pipeline (`.github/workflows/ci-cd.yml`) that runs automatically on every push and pull request to `main`:
+
+```mermaid
+flowchart TD
+    subgraph Trigger["🔔 Trigger"]
+        PUSH["Push / PR to main"]
+    end
+
+    subgraph Tests["🧪 Quality Gates"]
+        LINT["Lint & Test<br/>npm ci → lint → test"]
+        SEC["Security Audit<br/>npm audit"]
+    end
+
+    subgraph Build["🐳 Containerize"]
+        BX["Docker Buildx<br/>Multi-stage build<br/>GHA layer cache"]
+        GAR["Push to<br/>Artifact Registry"]
+    end
+
+    subgraph Deploy["🚀 Deploy to GKE"]
+        STG["Staging<br/>Helm upgrade<br/>auto-deploy"]
+        GATE["⏸ Manual Approval<br/>GitHub Environment"]
+        PRD["Production<br/>Helm upgrade<br/>rollout verify"]
+    end
+
+    PUSH --> LINT --> SEC
+    SEC --> BX --> GAR
+    GAR --> STG --> GATE --> PRD
+
+    style Trigger fill:#f0f9ff,stroke:#3b82f6
+    style Tests fill:#fefce8,stroke:#eab308
+    style Build fill:#eff6ff,stroke:#2563eb
+    style Deploy fill:#f0fdf4,stroke:#16a34a
+```
+
+**Required GitHub Secrets:**
+
+| Secret | Description |
+|--------|-------------|
+| `GCP_PROJECT_ID` | Your GCP project ID |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Workload Identity Federation provider |
+| `GCP_SERVICE_ACCOUNT` | GCP service account email for deployments |
+
+> **Note:** Production deployment uses [GitHub Environment protection rules](https://docs.github.com/en/actions/deployment/targeting-different-environments) — configure required reviewers in **Settings → Environments → production**.
+
 ## Tech Stack
 
 | Layer | Technology | Purpose |
@@ -103,7 +149,7 @@ flowchart LR
 | **Containers** | Docker (multi-stage) | Reproducible builds |
 | **Orchestration** | Kubernetes (GKE) + Helm | Scalable deployment |
 | **IaC** | Terraform | GCP resource provisioning |
-| **CI/CD** | Jenkins | Automated build/test/deploy |
+| **CI/CD** | GitHub Actions + Jenkins | Automated build/test/deploy |
 | **GitOps** | ArgoCD | Declarative K8s deployments |
 | **Config Mgmt** | Ansible | Server provisioning |
 | **Monitoring** | Prometheus + Grafana | Metrics & dashboards |
